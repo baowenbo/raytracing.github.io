@@ -320,9 +320,9 @@ circle and the area of the inscribing square:
 We picked a bunch of random points in the inscribing square and counted the fraction of them that
 were also in the unit circle. This fraction was an estimate that tended toward $\frac{\pi}{4}$ as
 more points were added. If we didn't know the area of a circle, we could still solve for it using
-the above ratio. We know that the ratio of areas of the unit circle and the inscribed square is
-$\frac{\pi}{4}$, and we know that the area of a inscribed square is $4r^2$, so we could then use
-those two quanties to get the area of our circle:
+the above ratio. We know that the ratio of areas of the unit circle and the inscribing square is
+$\frac{\pi}{4}$, and we know that the area of a inscribing square is $4r^2$, so we could then use
+those two quanties to get the area of a circle:
 
     $$ \frac{\text{area}(circle)}{\text{area}(square)} = \frac{\pi}{4} $$
     $$ \frac{\text{area}(circle)}{(2r)^2} = \frac{\pi}{4} $$
@@ -508,7 +508,7 @@ $I = 8/3$. You could rightly point to this example and say that integration is a
 work. That might be true in the case where the function is $f(x) = x^2$, but there exist many
 functions where it might be simpler to solve for the MC than for the integration, like
 $f(x) = sin^5(x)$. We could also use the MC algorithm for functions where an analytical integration
-does not exist, like $f(x) = \log(\sin(x))$. In graphics, we often have functions that we can write
+does not exist, like $f(x) = \ln(\sin(x))$. In graphics, we often have functions that we can write
 down explicitly but that have a complicated analytic integration, or, just as often, we have functions
 that _can_ be evaluated but that _can't_ be written down explicitly, and we will frequently find
 ourselves with a function that can _only_ be evaluated probabilistically. The function `ray_color`
@@ -659,19 +659,20 @@ If we have a PDF for the function that we care about, then we have the probabili
 will return a value within a particular interval. We can use this to determine where we should
 sample. Remember that this started as a quest to determine the best way to sample a scene so that we
 wouldn't get very bright pixels next to very dark pixels. If we have a PDF for the scene, then we
-can probabilisticallt steer our samples toward the light without making the image inaccurately
-bright. How do we generate a random number with that PDF $p(r)$? For that we will need some more
-machinery. Don’t worry this doesn’t go on forever!
+can probabilistically steer our samples toward the light without making the image inaccurately
+bright. How do we generate a random number with that PDF? For that we will need some more machinery.
+Don’t worry this doesn’t go on forever!
 
 <div class='together'>
 Our random number generator `random_double()` produces a random double between 0 and 1. The number
 generator is uniform between 0 and 1, so the double has an equal likelikhood of being any number
 between 0 and 1. If we pass the output from our random number generator to a variable,
-`double d = random_double()`, then we should be able to find some function $f(d)$ that gives us what
-we want. Suppose $e = f(d) = d^2$. While `random_double()` is uniform, taking this distribuition and
-passing it through the function `f(d)` makes it nonuniform. `f(d)` is no longer a uniform PDF. The
-PDF of $e$ will be bigger near 1 than it is near 0. To convert this general observation to a
-function, we need the _Cumulative Distribution Function_ $P(x)$:
+`double d = random_double()`, then we should be able to find some function $f(d)$ that gives us a
+non-uniform distribution that is weighted by PDF. Suppose $e = f(d) = d^2$. While `random_double()`
+is uniform, taking this distribuition and passing it through the function `f(d)` makes it
+nonuniform. `f(d)` is no longer a uniform PDF. The PDF of $e$ will be bigger near 1 than it is near
+0. To convert this general observation to a function, we need the _Cumulative Distribution Function_
+$P(x)$:
 
     $$ P(x) =  \int_{-\infty}^{x}  p(x') dx' $$
 
@@ -682,8 +683,8 @@ Or,
 
 <div class='together'>
 Where we don't explicitly set a probability, we assume to be zero. So for the example above,
-$p(r) = 0$, for $r < 0$ and $r > 2$. _i.e._, the probability of an $r$ there is zero. We can rewrite
-our $p(r)$ in piecewise fashion:
+$p(r) = 0$, for $r < 0$ and $r > 2$. _i.e._, the probability of an output there is zero. We can
+rewrite our $p(r)$ in piecewise fashion:
 
     $$ p(r)=\begin{cases}0 & r < 0 \\ \frac{r}{2} & 0 < r < 2 \\ 0 & r > 2  \\  \end{cases} $$ 
 
@@ -703,26 +704,61 @@ PDF, all you need to do is take the derivative:
 <div class='together'>
 If we evaluate the CDF, $P$ at $r = 1.0$, we get:
 
-  $$ P(1.0) = \frac{1}{4} $$
+    $$ P(1.0) = \frac{1}{4} $$
 
-This says _a random variable plucked from our PDF has a 25% change of being 1 or lower_. This gives
-rise to a clever observation that underlies many methods to generate non-uniform random numbers. We
-want a function `f()` that when we call it as `f(random_double())` we get a return value with a PDF
-$\frac{x^2}{4}$. We don’t know what that is, but we do know that 25% of what it returns should be
-less than 1.0, and 75% should be above 1.0. If $f()$ is increasing, then we would expect $f(0.25) =
-1.0$. This can be generalized to figure out $f()$ for every possible input:
+This says _a random variable plucked from our PDF has a 25% change of being 1 or lower_. We want a
+function $f()$ that takes a uniform distribution between 0 and 1 (_i.e_ `f(random_double())`), and 
+returns a random value with a distribution defined by the CDF $P(x) = \frac{x^2}{4}$. We don’t know
+yet know what the function $f()$ is analytically, but we do know that 25% of what it returns should
+be less than 1.0, and 75% should be above 1.0. If $f()$ monotonically increases, then we would
+expect $f(0.25) = 1.0$. This can be generalized to figure out $f()$ for every possible input:
 
-  $$ f(P(x)) = x $$
+
+    $$ f(P(x)) = x $$
+</div>
+
+Approximating Distributions
+---------------------------
+
+<div class='together'>
+Let's take some more samples:
+
+    $$ P(0.0) = 0 $$
+    $$ P(0.5) = \frac{1}{16} $$
+    $$ P(1.0) = \frac{1}{4} $$
+    $$ P(1.5) = \frac{9}{16} $$
+    $$ P(2.0) = 1 $$
+
+so, the function $f()$ has values
+
+    $$ f(P(0.0)) = f(0) = 0 $$
+    $$ f(P(0.5)) = f(\frac{1}{16}) = 0.5 $$
+    $$ f(P(1.0)) = f(\frac{1}{4}) = 1.0 $$
+    $$ f(P(1.5)) = f(\frac{9}{16}) = 1.5 $$
+    $$ f(P(2.0)) = f(1) = 2.0 $$
+
+We could use these intermediate values and interpolate between them to approximate $f()$:
+
+    ![Figure [approx f]: Approximating the non-uniform f()](../images/fig-3.05-approx-f.jpg)
+
+If you can't solve for the PDF analytically, then you can't solve for the CDF analytically. After
+all, the CDF is just the integral of the PDF. However, you can still create a distribution that
+approximates the PDF. If you take a bunch of samples from the random function you want the PDF from,
+you can approximate the PDF by getting a histogram of the samples and then converting to a PDF.
+
+TODO: Add ln(sin) plots here
+
+
 </div>
 
 <div class='together'>
-That means $f$ just undoes whatever $P$ does. So,
+    $$ f(P(x)) = x $$
 
-  $$ f(x) = P^{-1}(x) $$
-</div>
+That means $f()$ just undoes whatever $P()$ does. So,
 
-<div class='together'>
-The -1 means “inverse function”. Ugly notation, but standard. For our purposes, if we have PDF $p()$
+    $$ f(x) = P^{-1}(x) $$
+
+    The -1 means “inverse function”. Ugly notation, but standard. For our purposes, if we have PDF $p()$
 and cumulative distribution function $P()$, we can use this "inverse function" with a random number
 to get what we want:
 
