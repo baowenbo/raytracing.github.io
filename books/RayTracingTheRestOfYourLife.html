@@ -371,7 +371,7 @@ If we assume that we have all of the following:
 
     $$ y_i = f(x_i) $$
 
-3. A function $F(X)$ that takes $X$ as input and produces an output list $Y$:
+3. A function $F(X)$ that takes the list $X$ as input and produces the list $Y$ as output:
 
     $$ Y = F(X) $$
 
@@ -474,6 +474,7 @@ We could also write it as:
 
     $$  E[f(x) | a \leq x \leq b] = \frac{1}{b - a} \cdot \text{area}(f(x), a, b) $$
     $$ \text{average}(x^2, 0, 2) = \frac{1}{2 - 0} \cdot \text{area}( x^2, 0, 2 ) $$
+    $$ \text{average}(x^2, 0, 2) = \frac{1}{2 - 0} \cdot I $$
     $$ I = 2 \cdot \text{average}(x^2, 0, 2) $$
 
 </div>
@@ -507,15 +508,34 @@ This, as expected, produces approximately the exact answer we get with integrati
 $I = 8/3$. You could rightly point to this example and say that integration is actually a lot less
 work. That might be true in the case where the function is $f(x) = x^2$, but there exist many
 functions where it might be simpler to solve for the MC than for the integration, like
-$f(x) = sin^5(x)$. We could also use the MC algorithm for functions where an analytical integration
-does not exist, like $f(x) = \ln(\sin(x))$. In graphics, we often have functions that we can write
-down explicitly but that have a complicated analytic integration, or, just as often, we have functions
-that _can_ be evaluated but that _can't_ be written down explicitly, and we will frequently find
-ourselves with a function that can _only_ be evaluated probabilistically. The function `ray_color`
-from the first two books is an example of a function that can only be determined probabilistically.
-We can’t know what color can be seen from any given place in all directions, but we can
-statistically estimate which color can be seen from one particular place, for a single particular
-direction.
+$f(x) = sin^5(x)$.
+
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        for (int i = 0; i < N; i++) {
+            auto x = random_double(0,2);
+            sum += pow(sin(x), 5.0);
+        }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    [Listing [integ-sin5]: Integrating sin^5]
+
+We could also use the MC algorithm for functions where an analytical integration
+does not exist, like $f(x) = \ln(\sin(x))$.
+
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    for (int i = 0; i < N; i++) {
+        auto x = random_double(0,2);
+        sum += log(sin(x));
+    }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    [Listing [integ-ln-sin]: Integrating ln(sin)]
+
+In graphics, we often have functions that we can write down explicitly but that have a complicated
+analytic integration, or, just as often, we have functions that _can_ be evaluated but that _can't_
+be written down explicitly, and we will frequently find ourselves with a function that can _only_ be
+evaluated probabilistically. The function `ray_color` from the first two books is an example of a
+function that can only be determined probabilistically. We can’t know what color can be seen from
+any given place in all directions, but we can statistically estimate which color can be seen from
+one particular place, for a single particular direction.
 
 
 Density Functions
@@ -526,8 +546,8 @@ a fairly _major_ problem. Small light sources create too much noise. This is bec
 sampling doesn’t sample these light sources often enough. Light sources are only sampled if a ray
 scatters toward them, but this can be unlikely for a small light, or a light that is far away. If
 the background color is black, then the only real sources of light in the scene are from the lights
-that are actually placed about the scene. So there might be two rays that intersect at nearby points
-on a surface. One that is randomly reflected toward the light and one that is not. The ray that is
+that are actually placed about the scene. There might be two rays that intersect at nearby points on
+a surface, one that is randomly reflected toward the light and one that is not. The ray that is
 reflected toward the light will appear a very bright color. The ray that is reflected to somewhere
 else will appear a very dark color. The two intensities should really be somewhere in the middle.
 We could lessen this problem if we sent _more_ random samples toward this light, but this will cause
@@ -587,13 +607,13 @@ statistical predictor of a tree’s height:
 Indeed, with this continuous probability function, we can now say the likelihood that any given tree
 has a height that places it within any arbitrary span of multiple bins. This is a
 _probability density function_ (henceforth _PDF_). In short, a PDF is a continuous function that
-can integrated over to determine how likely a result is over an integral. 
+can be  integrated over to determine how likely a result is over an integral. 
 
 Constructing a PDF
 -------------------
-Let’s make a _PDF_ and use it a bit to understand it more. Suppose I have a random number $r$
-that is contained between $r=0$ and $r=2$ and whose probability is proportional to the value of $r$
-itself. We would expect the PDF $p(r)$ to look something like this:
+Let’s make a PDF and use it a bit to understand it more. Suppose I have a random number $r$ that is
+contained between $r=0$ and $r=2$ and whose probability is proportional to the value of $r$ itself.
+We would expect the PDF $p(r)$ to look something like this:
 
   ![Figure [linear-pdf]: A linear PDF](../images/fig-3.04-linear-pdf.jpg)
 
@@ -660,19 +680,72 @@ will return a value within a particular interval. We can use this to determine w
 sample. Remember that this started as a quest to determine the best way to sample a scene so that we
 wouldn't get very bright pixels next to very dark pixels. If we have a PDF for the scene, then we
 can probabilistically steer our samples toward the light without making the image inaccurately
-bright. How do we generate a random number with that PDF? For that we will need some more machinery.
-Don’t worry this doesn’t go on forever!
+bright. The _how_ of steering our samples without introducing inaccurate bias will be explained a
+little later, but for now we'll focus on generating samples if we have a PDF. How do we generate a
+random number with a PDF? For that we will need some more machinery. Don’t worry this doesn’t go on
+forever!
 
 <div class='together'>
 Our random number generator `random_double()` produces a random double between 0 and 1. The number
 generator is uniform between 0 and 1, so the double has an equal likelikhood of being any number
-between 0 and 1. If we pass the output from our random number generator to a variable,
-`double d = random_double()`, then we should be able to find some function $f(d)$ that gives us a
-non-uniform distribution that is weighted by PDF. Suppose $e = f(d) = d^2$. While `random_double()`
-is uniform, taking this distribuition and passing it through the function `f(d)` makes it
-nonuniform. `f(d)` is no longer a uniform PDF. The PDF of $e$ will be bigger near 1 than it is near
-0. To convert this general observation to a function, we need the _Cumulative Distribution Function_
-$P(x)$:
+between 0 and 1. If our PDF is uniform over a domain, say $a = 0$ and $b = 10$, then we can
+trivally produce perfect samples for this uniform PDF with `10.0 * random_double()`. That's an easy
+case, but the vast majority of cases that we're going to care about are nonuniform. We need to
+figure out a way to convert a uniform random number generator into a non-uniform random number
+generator, where the distribution is defined by the PDF. We'll just _assume_ that there exists a
+function $f(d)$ that takes uniform input and produces a nonuniform distribution weighted by PDF. Now
+we need to figure out a way to solve for $f(d)$.
+
+For the PDF given above, where $p(r) = \frac{r}{2}$, the probability of a random sample is higher
+toward 2 than it is toward 0. More 1.8s and 1.9s should be generated than 0.1s and 0.2s. If we put
+aside our mathematics hat for a second and put on our computer science hat, maybe we can figure out
+a smart way of partitioning the PDF. We know that there is a higher probability near 2 than near
+0, but what is the value that splits the probability in half? What is the value that a number chosen
+at random has a 50% chance of being higher than and 50% chance of being lower than? What is the $x$
+that solves:
+
+    $$ 0.5 = \int_{0}^{x}  \frac{r}{2} dr $$
+
+Solving gives us:
+
+    $$ 0.5 = \frac{r^2}{4} \Big|_{0}^{x} $$
+    $$ 0.5 = \frac{x^2}{4} $$
+    $$ x^2 = 2$$
+    $$ x = \sqrt{2}$$
+
+As a crude approximation we could create a function `f(d)` that takes `double d = random_double()`.
+It checks to see if `d` is less than 0.5 or greater. If it is less than 0.5 it produces a uniform
+number between 0 and $\sqrt{2}$, if it is greater than 0.5 it produces a uniform number between
+$\sqrt{2}$ and 2.
+
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    double function f(double d)
+    {
+        if(d <= 0.5
+        {
+            return sqrt(2.0) * random_double();
+        }
+        else
+        {
+            return sqrt(2.0) + (2 - sqrt(2)) * random_double();
+        }
+
+    }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    [Listing [crude-approx]: A crude, first-order approximation to nonuniform PDF]
+
+While our initial random number generator was uniform from 0 to 1:
+
+   ![Figure [uniform-dist]: A uniform distribution](../images/fig-3.05-approx-f.jpg)
+
+Our, new, crude approximation for \frac{r}{2} is nonuniform (but only just):
+
+    ![Figure [approx f]: A nonuniform distribution for r/2](../images/fig-3.05-approx-f.jpg)
+
+TODO: Explain that all PDFs will work, but if need better, Walk through recursion
+
+
+The _Cumulative Distribution Function_ $P(x)$:
 
     $$ P(x) =  \int_{-\infty}^{x}  p(x') dx' $$
 
